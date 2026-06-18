@@ -1,0 +1,70 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PHP syntax lint
+        run: find . -name '*.php' -not -path './adodb/*' | xargs php -l
+
+      - name: Unit tests (no DB required)
+        run: |
+          for f in tests/Equipment.test.php tests/Laptop.test.php; do
+            echo "=== $f ==="
+            output=$(php -f "$f")
+            echo "$output"
+            if echo "$output" | grep -qi "failed"; then
+              echo "FAIL: $f reported failures"
+              exit 1
+            fi
+          done
+
+  integration:
+    runs-on: ubuntu-latest
+    env:
+      MYSQL_ROOT_PASSWORD: ci_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker compose build --no-cache
+
+      - name: Start stack and wait for healthy
+        run: |
+          docker compose up -d
+          for i in $(seq 1 30); do
+            docker compose ps | grep -q "(healthy)" && break
+            echo "Waiting for DB... ($i/30)"
+            sleep 2
+          done
+          if ! docker compose ps | grep -q "(healthy)"; then
+            echo "DB never became healthy"
+            docker compose logs
+            exit 1
+          fi
+
+      - name: Smoke test HTTP response
+        run: |
+          for i in $(seq 1 10); do
+            curl -sfL http://localhost:8080/ | grep -qi 'quartermaster\|login\|html' && break
+            echo "Waiting for web... ($i/10)"
+            sleep 2
+          done
+          curl -sfL http://localhost:8080/ | grep -qi 'quartermaster\|login\|html' || \
+            { echo "Smoke test failed"; docker compose logs web; exit 1; }
+
+      - name: Run integration test suite
+        run: |
+          output=$(docker compose exec -T web php -f /var/www/html/tests/testAll.php)
+          echo "$output"
+          if echo "$output" | grep -qi "failed"; then
+            echo "FAIL: integration tests reported failures"
+            exit 1
+          fi
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
