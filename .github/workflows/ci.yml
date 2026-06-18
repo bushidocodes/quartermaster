@@ -49,11 +49,11 @@ jobs:
       - name: Smoke test HTTP response
         run: |
           for i in $(seq 1 10); do
-            curl -sf http://localhost:8080/ | grep -qi 'quartermaster\|login\|html' && break
+            curl -sfL http://localhost:8080/ | grep -qi 'quartermaster\|login\|html' && break
             echo "Waiting for web... ($i/10)"
             sleep 2
           done
-          curl -sf http://localhost:8080/ | grep -qi 'quartermaster\|login\|html' || \
+          curl -sfL http://localhost:8080/ | grep -qi 'quartermaster\|login\|html' || \
             { echo "Smoke test failed"; docker compose logs web; exit 1; }
 
       - name: Run integration test suite
