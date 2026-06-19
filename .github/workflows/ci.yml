@@ -5,7 +5,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: PHP syntax lint
         run: find . -name '*.php' -not -path './adodb/*' | xargs php -l
@@ -27,7 +27,7 @@ jobs:
     env:
       MYSQL_ROOT_PASSWORD: ci_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build Docker image
         run: docker compose build --no-cache
